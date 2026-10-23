@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+.venv/
+# Real runtime exports and credentials must never enter the repository.
+local-nodes.json
+subscription.txt
+links.txt
+clash.yaml
+server.key
+server.crt
+private/
