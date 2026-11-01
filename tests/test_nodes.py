@@ -9,6 +9,9 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
+if os.name != 'posix':
+    raise unittest.SkipTest('Aggregation locking and ownership tests require POSIX')
+
 spec = importlib.util.spec_from_file_location('nodes', Path(__file__).parents[1] / 'scripts/vps-nodes.py')
 nodes = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(nodes)

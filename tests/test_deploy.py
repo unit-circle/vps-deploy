@@ -4,14 +4,21 @@ import json
 import os
 from pathlib import Path
 import socket
+import shutil
 import subprocess
+import sys
 import tempfile
 import time
 import unittest
 import urllib.error
 import urllib.request
 
-SCRIPT = (Path(__file__).parents[1] / 'deploy-vps.sh').read_text()
+SCRIPT = (Path(__file__).parents[1] / 'deploy-vps.sh').read_text(encoding='utf-8')
+GIT_ROOT = Path(shutil.which('git') or '/usr/bin/git').parent.parent
+BASH = str(GIT_ROOT/'bin/bash.exe') if os.name == 'nt' else 'bash'
+OPENSSL = str(GIT_ROOT/'mingw64/bin/openssl.exe') if os.name == 'nt' else 'openssl'
+CHILD_ENV = {**os.environ, 'PYTHONUTF8':'1',
+             'PATH':str(Path(OPENSSL).parent) + os.pathsep + os.environ.get('PATH', '')}
 
 
 def block(tag):
@@ -20,8 +27,9 @@ def block(tag):
 
 class DeployTests(unittest.TestCase):
     def test_syntax_and_regressions(self):
-        subprocess.run(['bash','-n',str(Path(__file__).parents[1] / 'deploy-vps.sh')],check=True)
-        for tag in ['CHECK_IP','CHECK_PORTS','GENERATE','SUB_SERVER','VERIFY']:
+        subprocess.run([BASH,'-n',str(Path(__file__).parents[1] / 'deploy-vps.sh')],check=True)
+        subprocess.run([BASH,'-n',str(Path(__file__).parents[1] / 'bootstrap.sh')],check=True)
+        for tag in ['CHECK_IP','CHECK_NAME','CHECK_PORTS','GENERATE','RECORD_VERSION','SUB_SERVER','VERIFY']:
             ast.parse(block(tag))
         self.assertIn('WorkingDirectory=/var/lib/vps-hy', SCRIPT)
         self.assertIn('StateDirectory=vps-hy', SCRIPT)
@@ -33,35 +41,43 @@ class DeployTests(unittest.TestCase):
             root=Path(td)
             for name in ['root/vps-nodes','etc/hysteria','etc/vps-sub','usr/local/etc/xray']:
                 (root/name).mkdir(parents=True)
-            subprocess.run(['openssl','req','-x509','-newkey','rsa:2048','-nodes','-days','1',
+            subprocess.run([OPENSSL,'req','-x509','-newkey','rsa:2048','-nodes','-days','1',
                 '-subj','/CN=vps-node.local','-keyout',str(root/'etc/hysteria/server.key'),
                 '-out',str(root/'etc/hysteria/server.crt')],check=True,capture_output=True)
             def remap(code):
                 for path in ['/root/vps-nodes','/etc/hysteria','/etc/vps-sub','/usr/local/etc/xray']:
-                    code=code.replace(path,str(root/path.lstrip('/')))
+                    code=code.replace(path,(root/path.lstrip('/')).as_posix())
                 return code
             for label in ['PublicKey','Public key','Password','Password (PublicKey)']:
                 fixture='PrivateKey: '+'A'*43+'\n'+label+': '+'B'*43+'\nHash32: '+'C'*43+'\n'
                 prelude="import subprocess\noriginal=subprocess.check_output\ndef fake(args, **kwargs):\n    if args[0]=='/usr/local/bin/xray': return "+repr(fixture)+"\n    return original(args, **kwargs)\nsubprocess.check_output=fake\n"
-                subprocess.run(['python3','-c',prelude+remap(block('GENERATE'))],check=True,
-                    env={**os.environ,'VPS_PUBLIC_IP':'203.0.113.10','VPS_NODE_NAME':'Tokyo 日本'})
-                config=json.loads((root/'etc/vps-sub/clash.yaml').read_text())
-                native=json.loads((root/'root/vps-nodes/local-nodes.json').read_text())
-                xray=json.loads((root/'usr/local/etc/xray/config.json').read_text())
+                subprocess.run([sys.executable,'-c',prelude+remap(block('GENERATE'))],check=True,
+                    env={**CHILD_ENV,'VPS_PUBLIC_IP':'203.0.113.10','VPS_NODE_NAME':'Tokyo 日本'})
+                config=json.loads((root/'etc/vps-sub/clash.yaml').read_text(encoding='utf-8'))
+                native=json.loads((root/'root/vps-nodes/local-nodes.json').read_text(encoding='utf-8'))
+                xray=json.loads((root/'usr/local/etc/xray/config.json').read_text(encoding='utf-8'))
+                hy2=json.loads((root/'etc/hysteria/config.yaml').read_text(encoding='utf-8'))
+                self.assertEqual(xray['outbounds'],[{'protocol':'freedom','tag':'direct',
+                    'streamSettings':{'sockopt':{'domainStrategy':'ForceIPv4'}}}])
+                self.assertEqual(hy2['outbounds'],[{'name':'direct','type':'direct','direct':{'mode':'4'}}])
                 self.assertEqual(native['proxies'],config['proxies'])
                 self.assertEqual(config['proxies'][0]['name'],'Tokyo 日本-VLESS')
                 self.assertEqual(config['proxies'][0]['uuid'],xray['inbounds'][0]['settings']['clients'][0]['id'])
                 self.assertEqual(config['proxies'][0]['reality-opts']['public-key'],'B'*43)
                 self.assertEqual(len(config['proxies'][1]['fingerprint']),64)
                 self.assertNotIn('privateKey',json.dumps(config))
-                self.assertIn('%E6%97%A5%E6%9C%AC',(root/'root/vps-nodes/links.txt').read_text())
+                self.assertIn('%E6%97%A5%E6%9C%AC',(root/'root/vps-nodes/links.txt').read_text(encoding='utf-8'))
             with socket.socket() as sock:
                 sock.bind(('127.0.0.1',0));port=sock.getsockname()[1]
-            code=remap(block('SUB_SERVER')).replace("('0.0.0.0',8080)",repr(('127.0.0.1',port)))
-            proc=subprocess.Popen(['python3','-c',code],stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+            settings_path=root/'etc/vps-sub/settings.json'
+            settings=json.loads(settings_path.read_text(encoding='utf-8'))
+            settings['listen']='127.0.0.1'
+            settings_path.write_text(json.dumps(settings),encoding='utf-8')
+            code=remap(block('SUB_SERVER')).replace(",8080),Handler)",f",{port}),Handler)")
+            proc=subprocess.Popen([sys.executable,'-c',code],stdout=subprocess.PIPE,stderr=subprocess.PIPE,env=CHILD_ENV)
             opener=urllib.request.build_opener(urllib.request.ProxyHandler({}))
             try:
-                token=json.loads((root/'etc/vps-sub/settings.json').read_text())['token']
+                token=json.loads(settings_path.read_text(encoding='utf-8'))['token']
                 url=f'http://127.0.0.1:{port}/{token}/clash.yaml'
                 for attempt in range(40):
                     try:

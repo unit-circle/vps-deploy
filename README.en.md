@@ -2,140 +2,173 @@
 
 [简体中文](README.md) | **English**
 
-Deploy **VLESS Reality + Hysteria2** on a fresh Ubuntu / Debian VPS, generate a Clash / Mihomo subscription, and combine nodes from multiple VPS instances behind one stable subscription URL.
+Deploy **VLESS Reality + Hysteria2** on a fresh Ubuntu / Debian VPS, generate a Clash / Mihomo subscription, and use a menu for checks, backups, configuration migrations and explicit-version upgrades.
 
-> Status: local configuration, subscription-service and aggregation tests completed. The current repository version has not completed end-to-end acceptance on a real VPS. Start with a fresh server without important data. This is not an official Evoxt product.
+The default keeps the VPS's native exit and selects IPv4 outbound traffic. Network tuning and subscription HTTPS are optional, explicit actions.
 
-## Start here
+> Validation: local syntax, artifact-generation, subscription-service and maintenance-logic tests are available. The complete version still requires real-VPS installation, kernel-tuning and public ACME acceptance. This is not an official Evoxt product.
 
-| Goal | Guide |
-|---|---|
-| From an Evoxt account to a working client | [Evoxt beginner guide](docs/evoxt.en.md) |
-| Several VPS instances in one subscription | [Multi-server guide](docs/multi-server.en.md) |
-| Chinese documentation | [中文 README](README.md) |
-| Installation or connectivity issues | [Troubleshooting](docs/evoxt.en.md#troubleshooting-and-lessons-learned) |
+## Quick start
 
-## Features and limits
-
-- Two native nodes per VPS: VLESS Reality / Vision on TCP 443 and Hysteria2 on UDP 443.
-- Random UUID, Reality keys, HY2 password and subscription path. HY2 uses a self-signed certificate with certificate pinning.
-- Official Xray / Hysteria installers, dedicated service accounts, explicit permissions and systemd startup.
-- Custom labels such as `Tokyo-VLESS` and `Seoul-HY2`.
-- `vps-nodes` imports, replaces and removes remote node snapshots without changing the hub subscription URL.
-- Aggregation only combines client configuration. It does **not** provision remote VPS instances, relay their traffic or combine their bandwidth.
-- Default routing is `MATCH,PROXY`; no regional split routing, automatic latency groups, per-user quotas or web panel.
-- No automatic firewall changes, overwriting of existing deployments or in-place upgrades.
-
-## Requirements
-
-Intended for fresh Ubuntu 22.04 / 24.04 or Debian 12 / 13 with systemd, root access, a public IPv4 address and access to GitHub. Ubuntu 24.04 x86_64 is the preferred starting point. Other architectures and releases have not been verified by this project.
-
-Ensure `curl`, `python3` and `flock` exist. If needed:
+Connect to a fresh VPS by SSH as root and prepare the prerequisites:
 
 ```bash
 apt-get update && apt-get install -y curl ca-certificates python3 util-linux
 ```
 
-## One-command deployment
-
-Connect by SSH and run as root. Replace `YOUR_PUBLIC_IPV4` with the VPS public IPv4; choose a label instead of `Tokyo` if desired.
+Download the launcher and open the menu:
 
 ```bash
-curl --proto '=https' --tlsv1.2 -fL --retry 3 https://raw.githubusercontent.com/unit-circle/vps-deploy/main/deploy-vps.sh -o /root/deploy-vps.sh && bash /root/deploy-vps.sh YOUR_PUBLIC_IPV4 "Tokyo"
+curl --proto '=https' --tlsv1.2 -fL --retry 3 https://raw.githubusercontent.com/unit-circle/vps-deploy/main/bootstrap.sh -o /root/bootstrap-vps.sh && bash /root/bootstrap-vps.sh
 ```
 
-This downloads a file before executing it. Review the script first. For a reproducible project version, download and verify the entire repository at one commit; pinning only the entry script does not pin its companion tool, which otherwise follows `main`. Upstream installers and binaries currently use their stable versions at execution time.
+The launcher downloads the deployment script and companion tools at **one Git commit**, records that revision and validates syntax. The local bundle remains available for review and reuse. Fresh installation still uses the official stable installers and records the installed versions. Pinning the project does not pin upstream software.
 
-Do not rerun deployment to add nodes to an existing host. IP changes, incomplete installations and legacy migrations require inspecting the current state and backing it up first.
+The parameter-based installation remains available:
 
-## Required inbound firewall rules
+```bash
+bash /root/bootstrap-vps.sh YOUR_PUBLIC_IPV4 "Osaka"
+```
+
+Replace `YOUR_PUBLIC_IPV4` with the VPS public IPv4. Intended targets are Ubuntu 22.04 / 24.04 and Debian 12 / 13 with systemd; Ubuntu 24.04 is the preferred starting point. Existing configurations and credentials are never overwritten by installation. Other distributions, architectures and providers require real-host acceptance.
+
+## Menu actions
+
+| Action | Behavior |
+|---|---|
+| Fresh installation | Validate the OS, IP, label and ports; install both protocols and verify local services |
+| Status and Google checks | Inspect services, sockets, IPv4 settings, permissions, certificate consistency and native IPv4 HTTPS |
+| Private full backup | Save project configuration, credentials, certificates, tools, units and node binaries |
+| IPv4 migration | Preserve existing fields while updating outbounds and adding optional backend loopback-binding support |
+| Network tuning | Preview buffer maxima and optionally select BBR already available in the kernel |
+| Optional subscription HTTPS | Trusted certificates with renewal on a dedicated TCP 8443 listener |
+| Explicit-version upgrade | Select a stable Xray / Hysteria / Caddy version and verify SHA256 before replacing one binary |
+| Restore backup | Verify a same-host snapshot, back up the present state and restore saved files |
+| Show private subscription | Display the credential-bearing URL |
+
+Configuration migrations, tuning, HTTPS, binary upgrades and restores preview first. Type `APPLY` in the menu to execute. On failure, the tool attempts to restore touched files and previous service state, retaining the backup location. A backup only creates local private files and does not require `--apply`.
+
+## Encryption and subscriptions
+
+- VLESS uses Reality / Vision. The `decryption: none` setting does not mean the Reality transport is unencrypted.
+- Hysteria2 uses TLS and a random authentication password. Without a domain, clients must retain the self-signed certificate's `fingerprint` / URI `pinSHA256`; `skip-cert-verify` alone is not an authentication guarantee.
+- Services use dedicated users, restricted file permissions and systemd protection options. Checks compare certificate validity, pins and native client credentials.
+- **Default HTTP subscription downloads are not encrypted.** The random URL path authenticates requests but does not replace HTTPS. Without a domain, SSH can transfer the configuration for local import. Do not submit real subscriptions to public converters.
+
+Optional HTTPS uses `https://your-subscription-domain:8443/random-path/clash.yaml`, preserving node TCP / UDP 443. Set only A records pointing directly to the VPS; this automated workflow requires no AAAA record for the subscription hostname. TCP 80 is used for ACME HTTP-01 issuance and renewal, and TCP 8443 serves subscriptions. DNS and firewall rules are not changed automatically.
+
+Install a verified Caddy binary through the explicit-version menu, then choose HTTPS and supply a domain and ACME contact email. The tool verifies certificate trust, hostname and subscription contents before accepting the new URL. The backend becomes `127.0.0.1:8080`; clients must update their subscription URL. See [maintenance](docs/maintenance.en.md#optional-https).
+
+## Networking and Google
+
+Generated configurations include:
+
+```json
+{
+  "protocol": "freedom",
+  "tag": "direct",
+  "streamSettings": {
+    "sockopt": {"domainStrategy": "ForceIPv4"}
+  }
+}
+```
+
+```yaml
+outbounds:
+  - name: direct
+    type: direct
+    direct:
+      mode: "4"
+```
+
+Xray applies this strategy to destination domain resolution, without falling back to IPv6 when no IPv4 result exists. It does not convert a literal IPv6 destination supplied by a client to IPv4. Hysteria2's `"4"` mode uses IPv4 only. [Xray reference](https://xtls.github.io/config/transports/sockopt.html), [Hysteria2 reference](https://v2.hysteria.network/docs/advanced/Full-Server-Config/#customizing-direct-outbound).
+
+Tuning raises the relevant socket-buffer maxima to at least 16 MiB without lowering larger existing values. BBR is opt-in and requires reported kernel support. No kernel installation, active-interface queue replacement, IPv6 disabling or system DNS, MTU or firewall changes are performed. TCP BBR and Hysteria2 QUIC congestion control operate at different layers; larger values do not guarantee higher throughput. [Hysteria2 performance guide](https://v2.hysteria.network/docs/advanced/Performance/).
+
+Google checks test IPv4 DNS and HTTPS responses from Google, Accounts and Gstatic through the **native VPS exit**. Clients must still test actual requests through VLESS and HY2 separately. Location can also depend on IP data, device location and account activity. The script does not falsify location, replace the exit or guarantee Gmail links or regional identification. [Google location help](https://support.google.com/websearch/answer/179386?hl=en).
+
+## Required ports
 
 | Protocol | Port | Purpose |
 |---|---:|---|
-| TCP | 22 or your actual SSH port | Administration |
+| TCP | Actual SSH port, commonly 22 | Administration |
 | TCP | 443 | VLESS Reality |
 | UDP | 443 | Hysteria2 |
-| TCP | 8080 | HTTP subscription download |
+| TCP | 8080 | Default HTTP subscription; backend becomes loopback-only after HTTPS |
+| TCP | 80 | Optional HTTPS certificate issuance and renewal |
+| TCP | 8443 | Optional HTTPS subscription |
 
-TCP 443 and UDP 443 are separate rules. If both the cloud firewall and UFW are enabled, allow traffic in both. Restrict SSH to your own public IP when practical; node ports must allow client source IPs. TCP 80 is unnecessary for the default setup. No separate port purchase is required.
+Allow the appropriate rules in both the cloud firewall and UFW if both are enabled. The script never changes these rules automatically. Public 8080 can be restricted after HTTPS is enabled.
 
-## Use the deployment
+## Use and maintenance
+
+Add the subscription in Clash Verge / Mihomo, select the `PROXY` group and test VLESS and HY2 separately. TUN is optional for the first connection test.
+
+Fresh installations provide:
 
 ```bash
-# Three active results indicate running services, not verified public proxy handshakes
-systemctl is-active xray hysteria-server vps-sub
-
-# Print the secret subscription URL
-cat /root/vps-nodes/subscription.txt
-
-# List source counts without credentials
-vps-nodes list
+vps-manage check --google
+vps-manage backup
+vps-manage update
+vps-manage network
 ```
 
-Add a remote subscription in Clash Verge or another Mihomo client, paste the actual URL, update and activate it. Select the `PROXY` group, test VLESS and HY2 separately, then enable the client system proxy. TUN is optional for initial testing.
+Migration and tuning previews do not restart services. Execute through menu confirmation or add `--apply` as described in [maintenance](docs/maintenance.en.md). There is no unversioned automatic upgrade; read the selected upstream release notes first.
+
+On older deployments without `vps-manage`, download the launcher above and use its menu or `bash /root/bootstrap-vps.sh check --google`. Do not reinstall to migrate. Custom YAML, ACLs and complex outbounds can require manual review; the tool stops instead of rewriting unknown configurations.
 
 ## Multiple servers, one subscription
 
-Deploy both A (the subscription hub) and B (the added server) first. On B:
+Deploy each server independently. Export B's native pair, then import on A:
 
 ```bash
+# B
 vps-nodes export /root/b-native.json
-```
 
-On A, replace `B_PUBLIC_IPV4`:
-
-```bash
+# A; replace B_PUBLIC_IPV4
 scp root@B_PUBLIC_IPV4:/root/b-native.json /root/b-native.json
 vps-nodes import tokyo /root/b-native.json
 vps-nodes list
 ```
 
-A now publishes four nodes instead of two at the same URL. Update **A's subscription** in the client. Import C for six nodes. These JSON exports contain credentials and must never be committed to GitHub.
+Refresh A's subscription for four nodes. Reusing a source ID replaces its snapshot. Aggregation only combines client configuration; it does not relay traffic, combine bandwidth or periodically synchronize remote nodes. Exports contain credentials. See the [aggregation guide](docs/multi-server.en.md).
 
-To refresh B, export to a fresh filename, copy it to A and import with the same source ID. This replaces B's snapshot instead of appending duplicates. Synchronization is manual; see the [full guide](docs/multi-server.en.md).
-
-## Files, maintenance and security
+## Files and restore limits
 
 | Path | Contents |
 |---|---|
-| `/root/vps-nodes/subscription.txt` | Secret subscription URL |
-| `/root/vps-nodes/local-nodes.json` | Native nodes of this VPS |
-| `/root/vps-nodes/clash.yaml` | Full aggregated client configuration |
-| `/root/vps-nodes/sources/` | Imported remote snapshots |
-| `/root/vps-nodes/backups/` | Private aggregation backups |
-| `/root/vps-nodes/links.txt` | Two native share URIs; unaffected by aggregation |
-| `/etc/vps-sub/clash.yaml` | Published subscription content |
+| `/root/vps-nodes/subscription.txt` | Current secret subscription URL |
+| `/root/vps-nodes/local-nodes.json` | Native nodes |
+| `/root/vps-nodes/clash.yaml` | Aggregated client configuration |
+| `/root/vps-nodes/deployment.json` | Initial versions and recent controlled upgrade metadata |
 | `/usr/local/etc/xray/config.json` | Xray server configuration |
-| `/etc/hysteria/config.yaml` | HY2 server configuration |
+| `/etc/hysteria/` | HY2 configuration, certificate and private key |
+| `/etc/vps-sub/` | Subscription settings and published configuration |
+| `/etc/vps-sub-https/` | Optional Caddy configuration |
+| `/etc/sysctl.d/90-vps-deploy.conf` | Optional network tuning |
+| `/root/vps-backups/` | Private maintenance snapshots, including binaries and credentials |
+| `/root/vps-nodes/backups/` | Aggregation-tool backups |
 
-Files ending in `.yaml` are emitted as JSON, which YAML readers can accept. The management tool only accepts the project's JSON exports, not arbitrary third-party YAML.
+Project `.yaml` files contain JSON and require no YAML dependency. Maintenance does not automatically rewrite arbitrary third-party YAML.
 
-The random URL path is a credential. **HTTP does not encrypt subscription downloads.** HY2 pinning does not protect the HTTP subscription. For long-term use, put the endpoint behind trusted HTTPS on a domain you control and restrict public port 8080 after updating clients. This repository does not automatically configure HTTPS. Do not submit real URLs to public subscription-conversion services.
+Snapshots are root-readable file backups, **not encrypted disk images**, and may take tens to hundreds of MiB. Restoration targets the same deployed host, restores saved files and recorded network values, and does not recreate users or system dependencies or bulk-delete later files. A dedicated project tuning file is removed if absent in the snapshot. Encrypt backups separately before transferring them.
 
-There is no automatic uninstaller. Reinstalling or deleting a VPS or its configuration loses credentials; back up privately first. Never commit real node exports, passwords, private keys or account information.
+## Guides and checks
 
-## Evoxt promotion
-
-- Coupon: **to be supplied by the maintainer**.
-- Referral link: **to be supplied**; any commission relationship will be disclosed.
-- Discount, eligibility and expiration are governed by the checkout page and provider terms; they do not affect script functionality.
-- No specific price, throughput or latency is promised.
-
-## Local checks
+- [Evoxt account to client connection](docs/evoxt.en.md)
+- [Maintenance, HTTPS, upgrades and restoration](docs/maintenance.en.md)
+- [Multi-server aggregation](docs/multi-server.en.md)
 
 ```bash
+bash -n bootstrap.sh
 bash -n deploy-vps.sh
 python3 -m unittest discover -s tests -v
 ```
 
-These do not replace real-VPS installation, public TCP / UDP reachability or client proxy-request tests. Upstream installers can change; retain the final error before attempting a fix instead of disabling firewalls or deleting configuration.
+On Windows, use `python -X utf8 -m unittest discover -s tests -v`. Tests locate Git for Windows Bash / OpenSSL and skip Linux ownership and aggregation-lock tests. GitHub Actions provides Ubuntu 22.04 / 24.04 checks. Unit tests do not install services, download node binaries or connect to existing VPS instances; they do not replace real-host acceptance.
 
-## References
+## Evoxt promotion
 
-- [Official Xray installer](https://github.com/XTLS/Xray-install)
-- [Official Hysteria installer](https://v2.hysteria.network/docs/getting-started/Server-Installation-Script/)
-- [Mihomo Hysteria2 configuration](https://wiki.metacubex.one/en/config/proxies/hysteria2/)
-- [Official Evoxt deployment guide](https://evoxt.com/guides/how-to-deploy-a-evoxt-vm-with-10-simple-steps/)
-- [Official Evoxt firewall guide](https://evoxt.com/evoxt/evoxt-firewall-guide/)
+Coupon and referral details await the maintainer. Any commission relationship will be disclosed. Actual terms and eligibility come from the provider checkout and do not affect script functionality.
 
-Documentation checked on 2026-10-23. Follow applicable laws and your provider's terms.
+Maintenance version: 2026-11-01. Never commit real nodes, passwords, private keys or subscription URLs.

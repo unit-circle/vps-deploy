@@ -77,20 +77,22 @@ apt-get update && apt-get install -y curl ca-certificates python3 util-linux
 节点名称只用于识别，可以用 `Tokyo`、`Seoul` 等。将公网 IP 占位符替换后执行：
 
 ```bash
-curl --proto '=https' --tlsv1.2 -fL --retry 3 https://raw.githubusercontent.com/unit-circle/vps-deploy/main/deploy-vps.sh -o /root/deploy-vps.sh && bash /root/deploy-vps.sh YOUR_PUBLIC_IPV4 "Tokyo"
+curl --proto '=https' --tlsv1.2 -fL --retry 3 https://raw.githubusercontent.com/unit-circle/vps-deploy/main/bootstrap.sh -o /root/bootstrap-vps.sh && bash /root/bootstrap-vps.sh YOUR_PUBLIC_IPV4 "Tokyo"
 ```
 
 想先阅读脚本，可以分步执行：
 
 ```bash
-curl -fL --retry 3 https://raw.githubusercontent.com/unit-circle/vps-deploy/main/deploy-vps.sh -o /root/deploy-vps.sh
-less /root/deploy-vps.sh
-bash /root/deploy-vps.sh YOUR_PUBLIC_IPV4 "Tokyo"
+curl -fL --retry 3 https://raw.githubusercontent.com/unit-circle/vps-deploy/main/bootstrap.sh -o /root/bootstrap-vps.sh
+less /root/bootstrap-vps.sh
+bash /root/bootstrap-vps.sh YOUR_PUBLIC_IPV4 "Tokyo"
 ```
 
 `less` 中按 `q` 返回。安装时间取决于网络；只看到下载完成、Hysteria 安装成功或 Xray `Configuration OK` 都不等于整个部署成功。等待最终检查结果，不要同时在多个窗口重复部署。
 
 脚本生成的配置中，服务端 IP 来自命令参数，并不通过外部网站自动检测。不要误填电脑的局域网 IP。
+
+不带 IP 参数执行 `bash /root/bootstrap-vps.sh` 会启动菜单，包含检查、备份、网络调优、受控升级和可选 HTTPS。已有服务器应选维护操作。详见[维护说明](maintenance.zh-CN.md)。
 
 ## 6. 可选：启用 Ubuntu UFW
 
@@ -164,7 +166,7 @@ ss -lntup | grep -E ':(443|8080)\b'
 | 本机验证通过，客户端超时 | 检查云防火墙、UFW、IP、客户端支持情况和实际握手日志 |
 | HY2 可用，VLESS 不可用 | UDP 可达不证明 TCP 可达；分别检查协议和 Reality 参数 |
 | VLESS 可用，HY2 不可用 | 检查 UDP 443、HY2 服务状态以及客户端证书指纹是否完整 |
-| 订阅下载失败 | 检查 TCP 8080、`vps-sub`、是否复制完整路径；不要把协议手动改成 HTTPS，当前服务没有 TLS |
+| 订阅下载失败 | 默认模式检查 TCP 8080 与 `vps-sub`；已启用可选 HTTPS 时检查域名、8443 与 `vps-sub-https`。不要只把 URL 的 HTTP 改成 HTTPS |
 | 换区域后延迟不同 | 同厂商、同国家也可能路由不同；先比较基础网络，重装脚本无法保证降低延迟 |
 
 Windows 可以检查 TCP：
@@ -180,8 +182,8 @@ Test-NetConnection YOUR_PUBLIC_IPV4 -Port 8080
 
 - 服务默认开机自启；正常重启服务器后不需要重新部署。
 - 修改现有 IP 或服务凭据时，需要同步客户端配置和导入到主服务器的快照，本版没有自动换 IP 命令。
-- 官方程序升级可能改变安装器、账号、权限或服务配置；本项目不提供一键升级，升级前先备份。
-- HTTP 订阅包含凭据，建议后续配置你控制的可信 HTTPS；不要把真实订阅放进公开仓库或公共转换网站。
+- 通过维护菜单指定稳定版本升级，并校验 SHA256、备份与检查；不要盲目追随 latest，失败时检查回滚结果。
+- 默认 HTTP 订阅包含凭据；可在维护菜单配置自有域名 HTTPS（8443/TCP，80/TCP 用于证书）。不要把真实订阅放进公开仓库或公共转换网站。
 - 备份配置时务必包含证书、私钥、节点凭据和订阅设置，并保存到私密加密位置；单独备份 README 无法恢复节点。
 
 文档日期：2026-10-23。尚无当前完整版本在真实 VPS 的端到端验收记录。

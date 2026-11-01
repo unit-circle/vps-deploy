@@ -77,20 +77,22 @@ apt-get update && apt-get install -y curl ca-certificates python3 util-linux
 The label identifies nodes; examples include `Tokyo` and `Seoul`. Replace the IP placeholder:
 
 ```bash
-curl --proto '=https' --tlsv1.2 -fL --retry 3 https://raw.githubusercontent.com/unit-circle/vps-deploy/main/deploy-vps.sh -o /root/deploy-vps.sh && bash /root/deploy-vps.sh YOUR_PUBLIC_IPV4 "Tokyo"
+curl --proto '=https' --tlsv1.2 -fL --retry 3 https://raw.githubusercontent.com/unit-circle/vps-deploy/main/bootstrap.sh -o /root/bootstrap-vps.sh && bash /root/bootstrap-vps.sh YOUR_PUBLIC_IPV4 "Tokyo"
 ```
 
 To inspect the script first:
 
 ```bash
-curl -fL --retry 3 https://raw.githubusercontent.com/unit-circle/vps-deploy/main/deploy-vps.sh -o /root/deploy-vps.sh
-less /root/deploy-vps.sh
-bash /root/deploy-vps.sh YOUR_PUBLIC_IPV4 "Tokyo"
+curl -fL --retry 3 https://raw.githubusercontent.com/unit-circle/vps-deploy/main/bootstrap.sh -o /root/bootstrap-vps.sh
+less /root/bootstrap-vps.sh
+bash /root/bootstrap-vps.sh YOUR_PUBLIC_IPV4 "Tokyo"
 ```
 
 Press `q` to leave `less`. Downloads take time. A completed download, Hysteria installation message or Xray `Configuration OK` alone does not indicate a complete deployment. Wait for final validation and do not run multiple installers at once.
 
 The public address comes from the command argument; no external IP-detection site is used. Do not enter your computer's LAN address.
+
+Run `bash /root/bootstrap-vps.sh` without an IP argument for checks, backups, tuning, explicit-version upgrades and optional HTTPS. Use maintenance on existing deployments. See [maintenance](maintenance.en.md).
 
 ## 6. Optional Ubuntu UFW
 
@@ -164,7 +166,7 @@ ss -lntup | grep -E ':(443|8080)\b'
 | Local checks pass, client times out | Check both firewalls, public IP, client capabilities and handshake logs |
 | HY2 works but VLESS fails | UDP reachability does not prove TCP reachability; inspect TCP and Reality parameters |
 | VLESS works but HY2 fails | Inspect UDP 443, HY2 service and the client's complete certificate fingerprint |
-| Subscription download fails | Check TCP 8080, `vps-sub` and the full URL path. Changing HTTP to HTTPS does not add TLS |
+| Subscription download fails | In default mode check TCP 8080 and `vps-sub`; with optional HTTPS check the domain, 8443 and `vps-sub-https`. Changing only the URL scheme does not enable TLS |
 | Different latency after changing regions | Provider/country labels do not guarantee routes; reinstalling cannot guarantee lower base network latency |
 
 Windows TCP checks:
@@ -180,8 +182,8 @@ These do not test UDP. Use timestamps so old log errors are not mistaken for cur
 
 - Services start at boot; normal VPS reboots do not require redeployment.
 - IP or credential changes require updating client configuration and the hub's imported snapshots. There is no automatic IP-change command.
-- Upstream upgrades may change installer flags, users, permissions or units. This project has no one-command upgrade; back up first.
-- Protect subscription transport with trusted HTTPS for long-term use; never commit real subscriptions or submit them to public converters.
+- Use the maintenance menu for explicit stable-version upgrades with SHA256 verification, backups and checks. Do not blindly follow latest; inspect rollback results after failure.
+- Optional domain HTTPS uses TCP 8443 and ACME TCP 80. Default HTTP subscriptions are unencrypted; never commit real subscriptions or submit them to public converters.
 - Private backups must include credentials, certificate/key material and subscription settings. A README backup alone cannot restore nodes.
 
 Documentation date: 2026-10-23. The current complete version has no real-VPS end-to-end acceptance record yet.

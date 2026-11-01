@@ -1,0 +1,25 @@
+name: Local configuration and maintenance tests
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, ubuntu-24.04]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4, checked 2026-11-01
+        with:
+          persist-credentials: false
+      - name: Shell syntax
+        run: |
+          bash -n bootstrap.sh
+          bash -n deploy-vps.sh
+      - name: Isolated tests (no VPS deployment)
+        run: python3 -m unittest discover -s tests -v

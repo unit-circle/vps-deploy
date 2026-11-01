@@ -14,7 +14,7 @@ Deploy two nodes each on A, B and C. A acts as the hub and imports B/C snapshots
 | B | VLESS + HY2 | Additional endpoint; its native subscription is optional for the client |
 | C | VLESS + HY2 | Additional endpoint; its native subscription is optional for the client |
 
-The hub URL stays stable only while A's address/domain, port and random path stay unchanged. Changing A's IP does not magically update an IP-based URL. Trusted HTTPS on your own domain helps future migration but is not configured automatically here.
+The hub URL stays stable only while A's address/domain, port and random path stay unchanged. Changing A's IP does not automatically update an IP-based URL. Trusted HTTPS on your own domain helps future migration; see [optional HTTPS](maintenance.en.md#optional-https).
 
 ## 1. Deploy A and B separately
 
@@ -144,6 +144,6 @@ You must independently confirm both nodes belong to this VPS before migrating. D
 - `links.txt` still contains only the native two URIs; the full node list is in `clash.yaml` and the hub subscription.
 - Snapshot merging is not scheduled synchronization, load balancing, combined bandwidth, account revocation or automatic failover.
 - If A is unavailable, new subscription downloads fail. Previously cached configuration may still connect directly to B/C, depending on client behavior.
-- The published endpoint remains HTTP. Secure SSH import does not protect the client's HTTP download; use trusted HTTPS for long-term service.
+- The default endpoint uses HTTP. Secure SSH import does not encrypt the client's HTTP download; enable [optional HTTPS](maintenance.en.md#optional-https) on the hub and update its client subscription URL.
 
 Scheduled synchronization or a panel requires separate future work and is not an existing capability.
